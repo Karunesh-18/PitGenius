@@ -1,0 +1,91 @@
+@import url("https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,400&display=swap");
+@import "tailwindcss";
+
+:root {
+  /* Base palette */
+  --color-asphalt: #0c0f14; /* page background */
+  --color-graphite: #171c24; /* panel background */
+  --color-graphite-raised: #1d2330; /* hover/raised panel */
+  --color-hairline: #2a3140; /* borders, dividers */
+  --color-paper: #eceff3; /* primary text */
+  --color-steel: #8a93a6; /* secondary text */
+  --color-signal: #ff3b30; /* sparse: live indicator, primary action */
+
+  /* Functional timing-screen semantics, borrowed from F1 broadcast graphics */
+  --color-purple-fastest: #c77dff;
+  --color-green-best: #00d26a;
+  --color-yellow-slower: #ffd60a;
+
+  /* Tire compounds — colorblind-safe, reserved for Phase 2 lap/telemetry views */
+  --color-tire-soft: #e8384f;
+  --color-tire-medium: #f2c14e;
+  --color-tire-hard: #f4f4f4;
+  --color-tire-inter: #3fa34d;
+  --color-tire-wet: #2f7de1;
+
+  --font-display: "Titillium Web", ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme {
+  --color-asphalt: var(--color-asphalt);
+  --color-graphite: var(--color-graphite);
+  --color-graphite-raised: var(--color-graphite-raised);
+  --color-hairline: var(--color-hairline);
+  --color-paper: var(--color-paper);
+  --color-steel: var(--color-steel);
+  --color-signal: var(--color-signal);
+  --color-purple-fastest: var(--color-purple-fastest);
+  --color-green-best: var(--color-green-best);
+  --color-yellow-slower: var(--color-yellow-slower);
+  --font-display: var(--font-display);
+}
+
+/* Tailwind v4 drops the bare-numeric `font-<weight>` utilities (they only exist
+ * as named weights like `font-bold`). The app's type scale is written in terms
+ * of numeric weights, so re-register them as first-class utilities here rather
+ * than rewriting every call site. */
+@utility font-500 {
+  font-weight: 500;
+}
+@utility font-600 {
+  font-weight: 600;
+}
+@utility font-700 {
+  font-weight: 700;
+}
+@utility font-900 {
+  font-weight: 900;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-asphalt);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-signal);
+  color: var(--color-asphalt);
+}

@@ -1,0 +1,25 @@
+/** Static country -> emoji flag map for the 2023 calendar's actual countries
+ * (Jolpica/Ergast-style country strings). Extend as new circuits are added. */
+export const countryToFlag: Record<string, string> = {
+  Bahrain: '🇧🇭',
+  'Saudi Arabia': '🇸🇦',
+  Australia: '🇦🇺',
+  Japan: '🇯🇵',
+  China: '🇨🇳',
+  'United States': '🇺🇸',
+  Italy: '🇮🇹',
+  Monaco: '🇲🇨',
+  Spain: '🇪🇸',
+  Canada: '🇨🇦',
+  Austria: '🇦🇹',
+  'United Kingdom': '🇬🇧',
+  Hungary: '🇭🇺',
+  Belgium: '🇧🇪',
+  Netherlands: '🇳🇱',
+  Singapore: '🇸🇬',
+  Mexico: '🇲🇽',
+  Brazil: '🇧🇷',
+  Qatar: '🇶🇦',
+  UAE: '🇦🇪',
+  Azerbaijan: '🇦🇿',
+}
