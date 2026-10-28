@@ -91,7 +91,9 @@ def _upsert_session(db: OrmSession, race_id: int, session_type: str) -> int:
     return row.id
 
 
-def run_round(db: OrmSession, jolpica: JolpicaClient, season: int, round_: int, race_id: int) -> None:
+def run_round(
+    db: OrmSession, jolpica: JolpicaClient, season: int, round_: int, race_id: int, results_only: bool = False
+) -> None:
     driver_ref_to_id = fetch_ref_id_map(db, Driver.__table__, "driver_ref")
     team_ref_to_id = fetch_ref_id_map(db, Team.__table__, "constructor_ref")
     code_to_driver_id = {
@@ -134,6 +136,10 @@ def run_round(db: OrmSession, jolpica: JolpicaClient, season: int, round_: int, 
     upsert_rows(
         db, ConstructorStanding.__table__, constructor_standing_rows, conflict_cols=["season", "round", "team_id"]
     )
+
+    if results_only:
+        db.commit()
+        return
 
     # --- FastF1: lap times for Q and R sessions ---
     for session_type, session_id in (("Q", q_session_id if quali_races else None), ("R", r_session_id)):
@@ -195,7 +201,9 @@ def _backfill_track_outlines(db: OrmSession, season: int, schedule: list[dict]) 
         del circuits_missing[circuit_ref]
 
 
-def run_season(season: int, rounds: list[int] | None = None, settings: Settings | None = None) -> None:
+def run_season(
+    season: int, rounds: list[int] | None = None, settings: Settings | None = None, results_only: bool = False
+) -> None:
     settings = settings or get_settings()
     enable_fastf1_cache(settings)
     session_factory = make_session_factory(settings)
@@ -209,16 +217,17 @@ def run_season(season: int, rounds: list[int] | None = None, settings: Settings 
             row.round: row.id for row in db.execute(Race.__table__.select().where(Race.season == season)).all()
         }
 
-        target_rounds = rounds or sorted(int(r["round"]) for r in schedule)
+        target_rounds = rounds if rounds is not None else sorted(int(r["round"]) for r in schedule)
         for round_ in target_rounds:
             race_id = race_id_by_round.get(round_)
             if race_id is None:
                 log.warning("No race row for season=%s round=%s, skipping", season, round_)
                 continue
             log.info("Running season=%s round=%s", season, round_)
-            run_round(db, jolpica, season, round_, race_id)
+            run_round(db, jolpica, season, round_, race_id, results_only)
 
-        _backfill_track_outlines(db, season, schedule)
+        if not results_only:
+            _backfill_track_outlines(db, season, schedule)
 
 
 def run_telemetry_round(db: OrmSession, season: int, round_: int, race_id: int) -> None:
@@ -332,3 +341,137 @@ def run_telemetry_season(season: int, rounds: list[int] | None = None, settings:
                 continue
             log.info("Running telemetry season=%s round=%s", season, round_)
             run_telemetry_round(db, season, round_, race_id)
+
+
+def sync_season(season: int, settings: Settings | None = None) -> list[int]:
+    """Load rounds that have already been raced but have no results yet.
+    Cheap to run repeatedly: returns [] (and downloads nothing) when up to date.
+    """
+    import datetime as dt
+
+    settings = settings or get_settings()
+    session_factory = make_session_factory(settings)
+    with session_factory() as db:
+        done = {
+            r.round
+            for r in db.execute(
+                Race.__table__.select()
+                .join(SessionModel.__table__, SessionModel.race_id == Race.id)
+                .join(RaceResult.__table__, RaceResult.session_id == SessionModel.id)
+                .where(Race.season == season)
+            ).all()
+        }
+        due = [
+            r.round
+            for r in db.execute(Race.__table__.select().where(Race.season == season)).all()
+            if r.race_date < dt.date.today() and r.round not in done
+        ]
+    if not due:
+        # The calendar itself may be new (fresh season) or have no rounds yet.
+        run_season(season, rounds=[], settings=settings)
+        return []
+    run_season(season, rounds=due, settings=settings)
+    run_telemetry_season(season, rounds=due, settings=settings)
+    return due
+
+
+def _merge_rounds(races: list[dict], key: str) -> list[dict]:
+    """Jolpica paginates by result row, so one race can arrive split across pages: merge by round."""
+    merged: dict[int, dict] = {}
+    for race in races:
+        m = merged.setdefault(int(race["round"]), {**race, key: []})
+        m[key].extend(race.get(key, []))
+    return [merged[r] for r in sorted(merged)]
+
+
+def run_season_bulk(season: int, settings: Settings | None = None) -> None:
+    """Whole-season load in ~12 Jolpica calls (vs ~100 for run_season): results, qualifying and
+    standings only, no FastF1. Free-tier rate limits make the per-round path impractical for old seasons.
+
+    ponytail: per-round standings are cumulated from race results, so sprint points are missing
+    mid-season; the last round uses Jolpica's official standings. Use `run` for exact per-round data.
+    """
+    settings = settings or get_settings()
+    session_factory = make_session_factory(settings)
+    jolpica = JolpicaClient(settings.jolpica_base_url)
+
+    with session_factory() as db:
+        _sync_reference_data(db, jolpica, season)
+        db.commit()
+        race_id_by_round = {
+            r.round: r.id for r in db.execute(Race.__table__.select().where(Race.season == season)).all()
+        }
+        driver_ref_to_id = fetch_ref_id_map(db, Driver.__table__, "driver_ref")
+        team_ref_to_id = fetch_ref_id_map(db, Team.__table__, "constructor_ref")
+
+        for race in _merge_rounds(jolpica.get_qualifying(season), "QualifyingResults"):
+            race_id = race_id_by_round.get(int(race["round"]))
+            if race_id is None:
+                continue
+            sid = _upsert_session(db, race_id, "Q")
+            rows = normalize_qualifying_results(race, driver_ref_to_id, team_ref_to_id)
+            for row in rows:
+                row["session_id"] = sid
+            upsert_rows(db, QualifyingResult.__table__, rows, conflict_cols=["session_id", "driver_id"])
+
+        d_pts: dict[int, float] = {}
+        d_wins: dict[int, int] = {}
+        d_team: dict[int, int] = {}
+        t_pts: dict[int, float] = {}
+        t_wins: dict[int, int] = {}
+        last_round = 0
+        for race in _merge_rounds(jolpica.get_results(season), "Results"):
+            round_ = int(race["round"])
+            race_id = race_id_by_round.get(round_)
+            if race_id is None:
+                continue
+            sid = _upsert_session(db, race_id, "R")
+            rows = normalize_race_results(race, driver_ref_to_id, team_ref_to_id)
+            for row in rows:
+                row["session_id"] = sid
+                d, t = row["driver_id"], row["team_id"]
+                d_pts[d] = d_pts.get(d, 0) + row["points"]
+                t_pts[t] = t_pts.get(t, 0) + row["points"]
+                d_team[d] = t
+                if row["finish_position"] == 1:
+                    d_wins[d] = d_wins.get(d, 0) + 1
+                    t_wins[t] = t_wins.get(t, 0) + 1
+            upsert_rows(db, RaceResult.__table__, rows, conflict_cols=["session_id", "driver_id"])
+
+            ranked_d = sorted(d_pts, key=lambda d: (-d_pts[d], -d_wins.get(d, 0)))
+            upsert_rows(
+                db,
+                DriverStanding.__table__,
+                [
+                    {"season": season, "round": round_, "driver_id": d, "team_id": d_team[d], "position": i,
+                     "points": d_pts[d], "wins": d_wins.get(d, 0)}
+                    for i, d in enumerate(ranked_d, 1)
+                ],
+                conflict_cols=["season", "round", "driver_id"],
+            )
+            ranked_t = sorted(t_pts, key=lambda t: (-t_pts[t], -t_wins.get(t, 0)))
+            upsert_rows(
+                db,
+                ConstructorStanding.__table__,
+                [
+                    {"season": season, "round": round_, "team_id": t, "position": i,
+                     "points": t_pts[t], "wins": t_wins.get(t, 0)}
+                    for i, t in enumerate(ranked_t, 1)
+                ],
+                conflict_cols=["season", "round", "team_id"],
+            )
+            last_round = round_
+        db.commit()
+
+        if last_round:  # overwrite the final round with official standings (includes sprint points)
+            ds = [
+                s for e in jolpica.get_driver_standings(season)
+                if (s := normalize_driver_standing(e, season, last_round, driver_ref_to_id, team_ref_to_id))
+            ]
+            upsert_rows(db, DriverStanding.__table__, ds, conflict_cols=["season", "round", "driver_id"])
+            cs = [
+                s for e in jolpica.get_constructor_standings(season)
+                if (s := normalize_constructor_standing(e, season, last_round, team_ref_to_id))
+            ]
+            upsert_rows(db, ConstructorStanding.__table__, cs, conflict_cols=["season", "round", "team_id"])
+            db.commit()

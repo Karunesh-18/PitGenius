@@ -14,7 +14,7 @@ import requests
 PAGE_LIMIT = 100
 MAX_RETRIES = 5
 RETRY_BACKOFF_S = 3.0
-MIN_REQUEST_INTERVAL_S = 0.3  # stay under Jolpica's per-second rate limit
+MIN_REQUEST_INTERVAL_S = 0.8  # free tier: bursts get 429, so stay well under the limit
 
 
 class JolpicaClient:

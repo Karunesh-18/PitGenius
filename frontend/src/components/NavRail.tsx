@@ -6,6 +6,7 @@ const ITEMS = [
   { to: '/teams', label: 'Teams' },
   { to: '/strategy', label: 'Strategy' },
   { to: '/circuits', label: 'Circuits' },
+  { to: '/live', label: 'Live' },
 ]
 
 export function NavRail() {

@@ -230,3 +230,30 @@ export interface TireDegradationResponse {
   shap_contributions: ShapContribution[]
   explanation: string
 }
+
+export interface LiveTowerRow {
+  position: number
+  driver_number: number
+  code: string | null
+  name: string | null
+  team: string | null
+  team_colour: string | null
+  gap_to_leader: number | string | null
+  interval: number | string | null
+}
+
+export interface LiveSnapshot {
+  session: {
+    session_key: number
+    session_name: string
+    session_type: string
+    circuit_short_name: string
+    country_name: string
+    date_start: string
+    date_end: string
+    year: number
+  } | null
+  tower?: LiveTowerRow[]
+  weather?: { air_temperature: number; track_temperature: number; humidity: number; rainfall: number; wind_speed: number } | null
+  race_control?: { date: string; message: string; flag: string | null }[]
+}

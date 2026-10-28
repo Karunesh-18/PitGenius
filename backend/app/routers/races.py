@@ -11,6 +11,7 @@ from pitgenius_db.models import (
     QualifyingResult,
     Race,
     RaceResult,
+    Telemetry,
 )
 from pitgenius_db.models import Session as SessionModel
 from pitgenius_db.models import Team
@@ -43,6 +44,26 @@ def _winner_subquery():
         .where(SessionModel.session_type == "R", RaceResult.finish_position == 1)
         .subquery()
     )
+
+
+@router.get("/seasons")
+def list_seasons(db: OrmSession = Depends(get_db)):
+    """Seasons present in the active store; has_telemetry marks years with 3D lap replay data."""
+    tele = (
+        select(Race.season)
+        .join(SessionModel, SessionModel.race_id == Race.id)
+        .join(Telemetry, Telemetry.session_id == SessionModel.id)
+        .distinct()
+    )
+    with_tele = set(db.execute(tele).scalars())
+    with_results = (
+        select(Race.season)
+        .join(SessionModel, SessionModel.race_id == Race.id)
+        .join(RaceResult, RaceResult.session_id == SessionModel.id)
+        .distinct()
+    )
+    seasons = sorted(db.execute(with_results).scalars(), reverse=True)
+    return [{"season": s, "has_telemetry": s in with_tele} for s in seasons]
 
 
 @router.get("", response_model=list[RaceSummary])

@@ -1,4 +1,4 @@
-/** Static country -> emoji flag map for the 2023 calendar's actual countries
+/** Static country -> emoji flag map for every calendar loaded (2018+)
  * (Jolpica/Ergast-style country strings). Extend as new circuits are added. */
 export const countryToFlag: Record<string, string> = {
   Bahrain: '🇧🇭',

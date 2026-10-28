@@ -11,6 +11,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  seasons: () => request<{ season: number; has_telemetry: boolean }[]>('/races/seasons'),
+  live: () => request<import('./types').LiveSnapshot>('/live/session'),
   drivers: (season?: number) =>
     request<import('./types').DriverSummary[]>(`/drivers${season ? `?season=${season}` : ''}`),
   driver: (driverRef: string, season?: number) =>

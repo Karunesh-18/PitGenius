@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import circuits, drivers, races, standings, strategy, teams, tire_degradation
+from .db import archive_up
+from .routers import circuits, drivers, live, races, standings, strategy, teams, tire_degradation
 
 settings = get_settings()
 
@@ -23,8 +24,9 @@ app.include_router(standings.router)
 app.include_router(circuits.router)
 app.include_router(strategy.router)
 app.include_router(tire_degradation.router)
+app.include_router(live.router)
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "archive": "up" if archive_up() else "down"}

@@ -1,53 +1,61 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from './client'
+import { useSeason } from './season'
 import type { StrategySimulateRequest, TireDegradationRequest } from './types'
 
-export const SEASON = 2023 // Phase 1 MVP loads a single completed season
 
 export function useDrivers() {
-  return useQuery({ queryKey: ['drivers', SEASON], queryFn: () => api.drivers(SEASON) })
+  const season = useSeason()
+  return useQuery({ queryKey: ['drivers', season], queryFn: () => api.drivers(season) })
 }
 
 export function useDriver(driverRef: string | undefined) {
+  const season = useSeason()
   return useQuery({
-    queryKey: ['driver', driverRef, SEASON],
-    queryFn: () => api.driver(driverRef as string, SEASON),
+    queryKey: ['driver', driverRef, season],
+    queryFn: () => api.driver(driverRef as string, season),
     enabled: !!driverRef,
   })
 }
 
 export function useTeams() {
-  return useQuery({ queryKey: ['teams', SEASON], queryFn: () => api.teams(SEASON) })
+  const season = useSeason()
+  return useQuery({ queryKey: ['teams', season], queryFn: () => api.teams(season) })
 }
 
 export function useTeam(teamRef: string | undefined) {
+  const season = useSeason()
   return useQuery({
-    queryKey: ['team', teamRef, SEASON],
-    queryFn: () => api.team(teamRef as string, SEASON),
+    queryKey: ['team', teamRef, season],
+    queryFn: () => api.team(teamRef as string, season),
     enabled: !!teamRef,
   })
 }
 
 export function useRaces() {
-  return useQuery({ queryKey: ['races', SEASON], queryFn: () => api.races(SEASON) })
+  const season = useSeason()
+  return useQuery({ queryKey: ['races', season], queryFn: () => api.races(season) })
 }
 
 export function useRace(round: number | undefined) {
+  const season = useSeason()
   return useQuery({
-    queryKey: ['race', SEASON, round],
-    queryFn: () => api.race(SEASON, round as number),
+    queryKey: ['race', season, round],
+    queryFn: () => api.race(season, round as number),
     enabled: !!round,
   })
 }
 
 export function useDriverStandings() {
-  return useQuery({ queryKey: ['driverStandings', SEASON], queryFn: () => api.driverStandings(SEASON) })
+  const season = useSeason()
+  return useQuery({ queryKey: ['driverStandings', season], queryFn: () => api.driverStandings(season) })
 }
 
 export function useConstructorStandings() {
+  const season = useSeason()
   return useQuery({
-    queryKey: ['constructorStandings', SEASON],
-    queryFn: () => api.constructorStandings(SEASON),
+    queryKey: ['constructorStandings', season],
+    queryFn: () => api.constructorStandings(season),
   })
 }
 
@@ -69,29 +77,33 @@ export function useStrategySimulation(request: StrategySimulateRequest | null) {
 }
 
 export function useCircuits() {
-  return useQuery({ queryKey: ['circuits', SEASON], queryFn: () => api.circuits(SEASON) })
+  const season = useSeason()
+  return useQuery({ queryKey: ['circuits', season], queryFn: () => api.circuits(season) })
 }
 
 export function useCircuitIntelligence(circuitRef: string | undefined) {
+  const season = useSeason()
   return useQuery({
-    queryKey: ['circuitIntelligence', circuitRef, SEASON],
-    queryFn: () => api.circuitIntelligence(circuitRef as string, SEASON),
+    queryKey: ['circuitIntelligence', circuitRef, season],
+    queryFn: () => api.circuitIntelligence(circuitRef as string, season),
     enabled: !!circuitRef,
   })
 }
 
 export function useTelemetryDrivers(round: number | undefined) {
+  const season = useSeason()
   return useQuery({
-    queryKey: ['telemetryDrivers', SEASON, round],
-    queryFn: () => api.telemetryDrivers(SEASON, round as number),
+    queryKey: ['telemetryDrivers', season, round],
+    queryFn: () => api.telemetryDrivers(season, round as number),
     enabled: !!round,
   })
 }
 
 export function useDriverTelemetry(round: number | undefined, driverRef: string | undefined) {
+  const season = useSeason()
   return useQuery({
-    queryKey: ['driverTelemetry', SEASON, round, driverRef],
-    queryFn: () => api.driverTelemetry(SEASON, round as number, driverRef as string),
+    queryKey: ['driverTelemetry', season, round, driverRef],
+    queryFn: () => api.driverTelemetry(season, round as number, driverRef as string),
     enabled: !!round && !!driverRef,
   })
 }
@@ -105,9 +117,23 @@ export function useTireDegradationPrediction(request: TireDegradationRequest | n
 }
 
 export function useDriverPointsHistory(driverRef: string | undefined) {
+  const season = useSeason()
   return useQuery({
-    queryKey: ['driverPointsHistory', driverRef, SEASON],
-    queryFn: () => api.driverPointsHistory(driverRef as string, SEASON),
+    queryKey: ['driverPointsHistory', driverRef, season],
+    queryFn: () => api.driverPointsHistory(driverRef as string, season),
     enabled: !!driverRef,
+  })
+}
+
+export function useSeasons() {
+  return useQuery({ queryKey: ['seasons'], queryFn: () => api.seasons(), staleTime: 300_000 })
+}
+
+export function useLive() {
+  return useQuery({
+    queryKey: ['live'],
+    queryFn: () => api.live(),
+    refetchInterval: 5_000,
+    staleTime: 0,
   })
 }
